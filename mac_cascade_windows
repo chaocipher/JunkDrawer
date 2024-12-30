@@ -1,0 +1,149 @@
+-- This script is a macOS automation file written in AppleScript designed to cascade and resize application windows dynamically across the screen. Here’s a breakdown of its functionality:
+
+-- File Description
+
+-- Purpose:
+-- This script is designed to manage and cascade application windows on a macOS system. Each window is positioned and resized dynamically to create a cascading effect, ensuring better visibility and usability when multiple windows are open.
+
+-- Features:
+-- 	1.	Customizable Settings:
+-- 	•	Base Width Prompt: Prompts the user to input the width of the first window.
+-- 	•	Vertical Offset Prompt: Prompts the user to input the vertical spacing between cascading windows.
+-- 	2.	Dynamic Screen Adaptation:
+-- 	•	Detects screen resolution to ensure windows fit dynamically within the available display area.
+-- 	•	Adjusts horizontal stepping size based on the screen width and number of available windows.
+-- 	3.	Window Filtering:
+-- 	•	Only interacts with application windows that support position and size adjustments.
+-- 	•	Ignores minimized or background-only windows to focus on visible, interactive windows.
+-- 	4.	Cascading Logic:
+-- 	•	Each window is placed progressively lower and wider, creating a visually distinct cascading effect.
+-- 	•	Ensures windows extend to the bottom of the screen while maintaining their unique size and position.
+-- 	5.	Error Handling:
+-- 	•	Skips unsupported processes or windows, ensuring robustness across a variety of applications.
+-- 	6.	Logging for Debugging (optional):
+-- 	•	Logs window properties (name, position, size, and minimized status) for troubleshooting or customization.
+
+-- Key Variables:
+-- 	•	Base Width (baseWidth): Determines the starting width of the first window.
+-- 	•	Vertical Offset (YwindowOffset): Determines the spacing between cascading windows.
+-- 	•	Horizontal Step Size (widthStep): Dynamically calculated to distribute windows across the screen width.
+
+-- Prerequisites:
+-- 	•	macOS with AppleScript enabled.
+-- 	•	The script must be executed using a compatible AppleScript runner or the Script Editor.
+
+-- This script is ideal for users who want an organized view of multiple application windows without manual resizing or rearranging.
+
+-- 20241222 This version works perfectly. Each window is a different size.
+set {x, y} to {40, 20} -- Fixed top-left position for the first window
+set baseWidth to 1200 -- Reasonable starting width for usability
+set YwindowOffset to 80 -- Vertical offset for each subsequent window
+
+-- Prompt for Base Width
+set baseWidthDialog to display dialog "Enter the base width for the first window:" default answer "1200"
+set baseWidth to text returned of baseWidthDialog as integer
+
+-- Prompt for Y-Window Offset
+set yOffsetDialog to display dialog "Enter the vertical offset for cascading windows:" default answer "80"
+set YwindowOffset to text returned of yOffsetDialog as integer
+
+
+
+
+-- Get the screen resolution
+tell application "Finder"
+	set screenResolution to bounds of window of desktop
+	set screenWidth to item 3 of screenResolution
+	set screenHeight to item 4 of screenResolution
+end tell
+
+-- Retrieve all windows to cascade
+set allWindows to {}
+tell application "System Events"
+	set allProcesses to application processes
+	repeat with proc in allProcesses
+		try
+			if background only of proc is false then -- Exclude background-only processes
+				set appWindows to windows of proc
+				repeat with win in appWindows
+					try
+						-- Add window if it responds to position and size changes
+						set testPosition to position of win
+						set testSize to size of win
+						set end of allWindows to win
+					on error
+						-- Skip unsupported windows
+					end try
+				end repeat
+			end if
+		on error
+			-- Skip unsupported processes
+		end try
+	end repeat
+end tell
+
+-- Check if there are any windows available
+set windowCount to 0
+
+tell application "System Events"
+	repeat with win in allWindows
+		try
+
+            -- Query and log the AXMinimized property
+            set isMinimized to value of attribute "AXMinimized" of win
+            
+            if isMinimized is false then                
+                set windowCount to windowCount + 1 
+            end if
+        
+        on error
+			-- Skip unsupported windows
+            
+		end try
+
+	end repeat
+end tell
+
+if windowCount = 0 then
+	display dialog "No windows available for cascading!" buttons {"OK"}
+	return
+end if
+
+
+
+-- Calculate stepping size dynamically
+set widthStep to (screenWidth - x - baseWidth) / (windowCount - 1) -- Horizontal stepping
+
+-- Cascade windows
+set counter to 0 -- Initialize the counter for stepping
+tell application "System Events"
+	repeat with win in allWindows
+		try
+			-- Calculate dynamic size for cascading effect
+			set newWidth to baseWidth + (counter * widthStep) -- Wider as we progress
+			set newY to y + (counter * YwindowOffset) -- Lower starting position
+			
+			-- Place the window
+			set position of win to {x, newY}
+			set size of win to {newWidth, screenHeight - newY} -- Extend to bottom of the screen
+
+            -- Query and log the AXMinimized property
+            set isMinimized to value of attribute "AXMinimized" of win
+       
+
+			-- log "Name: " & name of win & ", Position: " & position of win & ", Size: " & size of win & ", AXMinimized: " & isMinimized
+            
+            if isMinimized is false then
+                
+                set counter to counter + 1 -- Increment counter for the next window
+                
+            end if
+            -- log "Counter: " & counter
+		
+        on error
+			-- Skip unsupported windows
+            
+		end try
+
+	end repeat
+end tell
